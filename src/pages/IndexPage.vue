@@ -9,7 +9,8 @@
           :style="{ minWidth: `${fileUploadPer[index] * 2}px`, maxWidth: `${fileUploadPer[index]}px`, backgroundColor: 'green' }">
           {{ fileUploadPer[index] }}</div>
         <!-- {{ fileUploadPer[index] }} -->
-        <button @click="cancelRequest(index)">Pause</button>
+        <!-- ! below pause code is working but there are some bugs that we have to solve edge case -->
+        <!-- * <button @click="cancelRequest(index)">Pause</button> -->
 
       </div>
       <!-- <button @click="cancelRequest">cancel</button> -->
@@ -98,6 +99,7 @@ const uploadFileChunks = (file: any, defaultOptions: any, index: number) => {
   const formData = new FormData();
   formData.append('file', file, file.name)
   formData.append('fileId', defaultOptions.fileId)
+  // formData.append('fileName', file.name)
   // header for file upload.
   const chunk = file.slice(defaultOptions.startingByte);
   const headers = {
@@ -133,7 +135,8 @@ const uploadFile = (file: any, index: number) => {
     headers: headers
   }).then((res: any) => {
     console.log('responce form uploadfile request-upload: ', res)
-    defaultOptions = { ...defaultOptions, fileId: res.fileId }
+    defaultOptions = { ...defaultOptions, fileId: res.data.fileId }
+    console.log('default options: ',defaultOptions)
     uploadFileChunks(file, defaultOptions, index)
   })
 }
