@@ -34,6 +34,8 @@
 <script setup lang="ts">
 import axios from 'axios';
 import { ref } from 'vue';
+console.log('demo');
+
 // const splitFile = async (event: any) => {
 //   const fileInput = event.target;
 //   console.log(fileInput);
@@ -136,7 +138,7 @@ const uploadFile = (file: any, index: number) => {
   }).then((res: any) => {
     console.log('responce form uploadfile request-upload: ', res)
     defaultOptions = { ...defaultOptions, fileId: res.data.fileId }
-    console.log('default options: ',defaultOptions)
+    console.log('default options: ', defaultOptions)
     uploadFileChunks(file, defaultOptions, index)
   })
 }
