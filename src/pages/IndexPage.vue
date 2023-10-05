@@ -10,7 +10,8 @@
           {{ fileUploadPer[index] }}</div>
         <!-- {{ fileUploadPer[index] }} -->
         <!-- ! below pause code is working but there are some bugs that we have to solve edge case -->
-        <!-- * <button @click="cancelRequest(index)">Pause</button> -->
+        <button @click="cancelRequest(item)">Pause</button>
+        <button @click="resumeUpload(item)">Resume</button>
 
       </div>
       <!-- <button @click="cancelRequest">cancel</button> -->
@@ -34,47 +35,6 @@
 <script setup lang="ts">
 import axios from 'axios';
 import { ref } from 'vue';
-// const splitFile = async (event: any) => {
-//   const fileInput = event.target;
-//   console.log(fileInput);
-//   const file = fileInput.files[0];
-//   console.log({ file });
-
-//   const chunkSize = 1024 * 1024; // 1MB chunks (you can adjust this size)
-//   console.log({ chunkSize });
-
-//   const chunks = [];
-//   console.log({ chunks });
-
-//   let offset = 0;
-//   console.log(offset);
-
-
-//   while (offset < file.size) {
-//     const chunk = file.slice(offset, offset + chunkSize);
-//     console.log({ chunk });
-
-//     chunks.push(chunk);
-//     offset += chunkSize;
-//     console.log({ offset, chunkSize });
-
-//   }
-
-//   // Send chunks to the backend (Node.js server)
-//   for (const chunk of chunks) {
-//     // // You can use Fetch API or Axios to send the chunks to the server.
-//     // // Make a POST request to your Node.js server and send the chunk data.
-//     // const response = await fetch('/#', {
-//     //   method: 'POST',
-//     //   body: chunk,
-//     // });
-//     // // Handle the server's response if needed.
-//     // console.log({ response });
-
-//     console.log('chunk of file: ', chunk);
-
-//   }
-// }
 
 const ENDPOINTS = {
   UPLOAD: 'http://localhost:1234/upload',
@@ -85,21 +45,22 @@ const ENDPOINTS = {
 const files = ref<any>([])
 const fileUploadPer = ref<any>([])
 
-
 let defaultOptions = {
   url: 'http://localhost:1234/upload',
   startingByte: 0,
   fileId: '',
 };
 
-let token: any = [];
+let allFileId: any = []; // created global file for id, file name,
 
+// Chunk upload apiCall
 const uploadFileChunks = (file: any, defaultOptions: any, index: number) => {
   // created form data for media to append
   const formData = new FormData();
   formData.append('file', file, file.name)
   formData.append('fileId', defaultOptions.fileId)
   // formData.append('fileName', file.name)
+
   // header for file upload.
   const chunk = file.slice(defaultOptions.startingByte);
   const headers = {
@@ -107,9 +68,11 @@ const uploadFileChunks = (file: any, defaultOptions: any, index: number) => {
     'Content-Length': chunk.size,
     'Content-Range': `bytes=${defaultOptions.startingByte}-${defaultOptions.startingByte + chunk.size}/${file.size}`,
   };
-  // token for pause and resume file
+
+  // created token to trace api call request
   const specificToken = axios.CancelToken.source();
-  token.push(specificToken)
+  allFileId.find((f: any) => f.file === file.name && (f.apiToken = specificToken, true)); // add that token globally
+
   // file upload api call form axios
   axios.post(ENDPOINTS.UPLOAD, formData,
     {
@@ -117,9 +80,13 @@ const uploadFileChunks = (file: any, defaultOptions: any, index: number) => {
       headers: headers,
       onUploadProgress(progressEvent) {
         console.log('process event', progressEvent)
-        const percentage = Math.round(
-          (progressEvent.loaded / progressEvent.total) * 100
-        );
+        let percentage = 0
+        if (progressEvent.total) {
+          percentage = Math.round(
+            ((progressEvent.loaded) / (progressEvent.total)) * 100
+          );
+        }
+
         fileUploadPer.value[index] = percentage
         console.log(`Upload Progress: ${percentage}%`);
       },
@@ -131,39 +98,46 @@ const uploadFile = (file: any, index: number) => {
   const headers = {
     'Content-Type': 'application/json',
   };
+
   axios.post(ENDPOINTS.UPLOAD_REQUEST, JSON.stringify({ fileName: file.name }), {
     headers: headers
-  }).then((res: any) => {
+  })
+  .then((res: any) => {
     console.log('responce form uploadfile request-upload: ', res)
+    allFileId.push({ file: file.name, fileId: res.data.fileId })
     defaultOptions = { ...defaultOptions, fileId: res.data.fileId }
-    console.log('default options: ',defaultOptions)
-    uploadFileChunks(file, defaultOptions, index)
+    console.log('default options: ', defaultOptions)
+    uploadFileChunks(file, defaultOptions, index) // This is call for file chunk upload
   })
 }
 
 const splitFile = (e: any) => {
   console.log('whole event: ', e)
-
   files.value = Array.from(e.target.files)
-
   console.log('files that are selected: ', files.value, 'type of files: ', typeof (files.value))
-
   files.value.map((file: any, index: number) => {
     uploadFile(file, index)
   })
-
   // for (var pair of formData.entries()) {
   //   console.log(pair[0], ',', pair[1])
   //   // console.log(pair[0]+ ', ' + pair[1]);
   // }
-
-
 }
 
-const cancelRequest = (index: number) => {
-  if (token[index]) {
-    // If a request is ongoing, cancel it
-    token[index].cancel('Request canceled by user.');
-  }
+const resumeUpload = (file: any) => {
+  const specificFile = allFileId.find((f: any) => f.file == file.name)
+
+  const query = `${ENDPOINTS.UPLOAD_STATUS}?fileName=${file.name}&fileId=${specificFile.fileId}`
+
+  axios.get(query)
+    .then((res) => {
+      console.log(res)
+    }).catch((e) => { console.log('error while calling an resume: ', e) })
+}
+
+const cancelRequest = (file: any) => {
+  allFileId.find((f: any) => {
+    f.file == file.name && f.apiToken.cancel('Request canceled by user.'), true
+  })
 };
 </script>
