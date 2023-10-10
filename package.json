@@ -1,9 +1,9 @@
 {
-  "name": "quasar-media-poc",
+  "name": "mediaupload-quasar",
   "version": "0.0.1",
-  "description": "Streaming media \u0016platform",
+  "description": "A Quasar Project",
   "productName": "Quasar App",
-  "author": "vijay-thumar <vijaythumar1020@gmail.com>",
+  "author": "Palak Zalavadia <palak.z@simformsolutions.com>",
   "private": true,
   "scripts": {
     "lint": "eslint --ext .js,.ts,.vue ./",
@@ -14,9 +14,6 @@
   },
   "dependencies": {
     "@quasar/extras": "^1.16.4",
-    "@syncfusion/ej2-vue-inputs": "^23.1.38",
-    "@syncfusion/ej2-vue-schedule": "^23.1.38",
-    "ant-design-vue": "^4.0.3",
     "axios": "^1.2.1",
     "pinia": "^2.0.11",
     "quasar": "^2.6.0",
