@@ -22,9 +22,14 @@
             :style="{ minWidth: `${file.fileUploadPercentage * 2}px`, maxWidth: `${file.fileUploadPercentage * 2}px`, backgroundColor: 'green' }">
             {{ file.fileUploadPercentage }}%</div>
         </div>
-        <div v-if="file.fileUploadPercentage >= 100"></div>
-        <button @click="cancelRequest(file)">Pause</button>
-        <button @click="resumeUpload(file)">Resume</button>
+        <span class="btns" v-if="file.fileUploadPercentage >= 100">
+          Upload completed
+        </span>
+        <span class="btns" v-else>
+          <button @click="cancelRequest(file)">Pause</button>
+          <button @click="resumeUpload(file)">Resume</button>
+          <!-- <button @click="retryUpload(file.file)">Retry Upload</button> -->
+        </span>
       </div>
       <!-- <button @click="cancelRequest">cancel</button> -->
     </div>
@@ -55,11 +60,15 @@
   cursor: pointer;
 }
 
-.progress-wrapper{
-display: inline-block;
-background-color: #bbb;
-min-width: 200px;
-max-width: 200px;
+.progress-wrapper {
+  display: inline-block;
+  background-color: #bbb;
+  min-width: 200px;
+  max-width: 200px;
+}
+
+.btns {
+  padding: 6px 12px;
 }
 </style>
 
@@ -85,7 +94,7 @@ let defaultOptions = {
 const allFileId = ref<any>([]) // created global file for id, file name,
 
 // Chunk upload apiCall
-const uploadFileChunks = (file: any, options: any) => {
+const uploadFileChunks = (file: any, options: any) => { // This will take file and create a chunk and upload a file chunk that is remaining
   // created form data for media to append
   const formData = new FormData();
   const fileIndex = allFileId.value.findIndex((f: any) => f.fileName === file.name)
@@ -95,18 +104,16 @@ const uploadFileChunks = (file: any, options: any) => {
   formData.append('file', chunk, file.name)
   formData.append('fileId', selectedFile.fileId)
   // header for file upload.
-  const headers = {
+  const headers = { // File chunk upload header
     'X-File-Id': selectedFile.fileId,
     // 'Content-Length': chunk.size,
     'Content-Range': `bytes=${options.startingByte}-${options.startingByte + chunk.size}/${file.size}`,
   };
 
-  // created token to trace api call request
-  const specificToken = axios.CancelToken.source();
+  const specificToken = axios.CancelToken.source(); // created token to trace api call request
   allFileId.value.find((f: any) => f.fileName === file.name && (f.apiToken = specificToken, true)); // add that token globally
 
-  // file upload api call form axios
-  axios.post(ENDPOINTS.UPLOAD, formData,
+  axios.post(ENDPOINTS.UPLOAD, formData, // file upload api call form Axios
     {
       cancelToken: specificToken.token,
       headers: headers,
@@ -124,16 +131,21 @@ const uploadFileChunks = (file: any, options: any) => {
             ((progressEvent.loaded) / (progressEvent.total)) * 100
           );
         }
-
         // fileUploadPer.value[index] = percentage
         allFileId.value.find((f: any) => f.fileName === file.name && (f.fileUploadPercentage = percentage, true))
         console.log(`Upload Progress: ${percentage}%`);
       },
       ...defaultOptions
+    }).then((res) => {
+      console.log(res)
+    })
+    .catch((err) => {
+      allFileId[fileIndex].error = err
+      console.log(err)
     })
 }
 
-const uploadFile = (file: any) => {
+const uploadFile = (file: any) => { // Upload file request it will create an empty file and return id for it to append same file via chunks
   const headers = {
     'Content-Type': 'application/json',
   };
@@ -166,15 +178,19 @@ const splitFile = (e: any) => {
 
 const resumeUpload = (file: any) => {
   // const specificFile = allFileId.value.find((f: any) => f.fileName == file.name)
-
   const query = `${ENDPOINTS.UPLOAD_STATUS}?fileName=${file.fileName}&fileId=${file.fileId}`
-
   axios.get(query)
     .then((res: any) => {
-      console.log('defaultOptions --> res: ', res)
       defaultOptions.startingByte = res.data.totalChunkUploaded
       uploadFileChunks(file.file, { ...defaultOptions, startingByte: res.data.totalChunkUploaded })
-    }).catch((e) => { console.log('error while calling an resume: ', e) })
+    })
+    .catch((e) => {
+      console.log('error while calling an resume: ', e)
+    })
+}
+
+const retryUpload = (file:any) => {
+  uploadFileChunks(file, defaultOptions)
 }
 
 const cancelRequest = (file: any) => {
