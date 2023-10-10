@@ -1,6 +1,6 @@
-# Quasar App (quasar-media-poc)
+# Quasar App (mediaupload-quasar)
 
-Streaming media \u0016platform
+A Quasar Project
 
 ## Install the dependencies
 ```bash
@@ -39,4 +39,3 @@ quasar build
 
 ### Customize the configuration
 See [Configuring quasar.config.js](https://v2.quasar.dev/quasar-cli-vite/quasar-config-js).
-# MediaUpload-quasar

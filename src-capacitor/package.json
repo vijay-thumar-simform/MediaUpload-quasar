@@ -1,0 +1,13 @@
+{
+  "name": "mediaupload-quasar",
+  "version": "0.0.1",
+  "description": "A Quasar Project",
+  "author": "Palak Zalavadia <palak.z@simformsolutions.com>",
+  "private": true,
+  "dependencies": {
+    "@capacitor/android": "^5.4.2",
+    "@capacitor/app": "^5.0.0",
+    "@capacitor/cli": "^5.0.0",
+    "@capacitor/core": "^5.0.0"
+  }
+}
