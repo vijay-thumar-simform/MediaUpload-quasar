@@ -2,8 +2,18 @@
   <!-- <q-page class="row items-center justify-evenly"> -->
   <q-page class="row items-center justify-evenly">
     <div class="container">
+      <div v-if="serverFiles && serverFiles?.length > 0">
+        Available files for download
+        <div v-for="file in serverFiles" :key="file">
+          <button @click="downloadFile(file)">{{ formateFileName(file) }}</button>
+          <!-- <button @click="downloadFile(file)">{{ file }}</button> -->
+          <div class="progress-bar-container">
+            <div :id="file" class="progress-bar"></div>
+          </div>
+        </div>
+      </div>
       <label class="upload-btn">
-        upload
+        Upload Video
         <input type="file" id="fileInput" accept="video/*" :multiple="'true'" @change="splitFile" style="display: none;">
       </label>
       <!-- <div v-for="(item, index) in files" :key="item.id">
@@ -14,6 +24,10 @@
         <button @click="cancelRequest(item)">Pause</button>
         <button @click="resumeUpload(item)">Resume</button>
       </div> -->
+
+      <div v-for="item in allFileId" :key="item.fileId">
+        {{ item.error }}
+      </div>
 
       <div v-for="file in allFileId" :key="file.file">
         {{ file.fileName }}
@@ -31,46 +45,11 @@
           <!-- <button @click="retryUpload(file.file)">Retry Upload</button> -->
         </span>
       </div>
-      <!-- <button @click="cancelRequest">cancel</button> -->
+
+      <button @click="getFiles()">get files</button>
     </div>
   </q-page>
 </template>
-
-<style>
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: auto auto;
-  justify-content: center;
-  /* align-items: left; */
-  /* width: 100%; */
-  max-width: fit-content;
-}
-
-.upload-btn {
-  background: #607D8B;
-  color: #fff;
-  border-radius: 5px;
-  padding: 15px 20px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: bold;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.progress-wrapper {
-  display: inline-block;
-  background-color: #bbb;
-  min-width: 200px;
-  max-width: 200px;
-}
-
-.btns {
-  padding: 6px 12px;
-}
-</style>
 
 <script setup lang="ts">
 import axios from 'axios';
@@ -79,9 +58,11 @@ import { ref } from 'vue';
 const ENDPOINTS = {
   UPLOAD: 'http://localhost:1234/upload',
   UPLOAD_STATUS: 'http://localhost:1234/upload-status',
-  UPLOAD_REQUEST: 'http://localhost:1234/upload-request'
+  UPLOAD_REQUEST: 'http://localhost:1234/upload-request',
+  GET_FILES: 'http://localhost:1234/files',
+  DOWNLOAD_FILE: 'http://localhost:1234/download'
 }
-
+const serverFiles = ref<string[]>([])
 const files = ref<any>([])
 // const fileUploadPer = ref<any>([])
 
@@ -92,6 +73,118 @@ let defaultOptions = {
 };
 
 const allFileId = ref<any>([]) // created global file for id, file name,
+
+const getFiles = () => {
+  fetch(ENDPOINTS.GET_FILES)
+    .then(res => {
+      console.log('fetch file response: --> ', res)
+      if (!res.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return res.json();
+    })
+    .then(data => {
+      console.log('List of files:', data.files);
+      serverFiles.value = data.files
+    })
+    .catch(error => {
+      console.log('Error:', JSON.stringify(error));
+    });
+
+  // axios.get('http://localhost:1234/files')
+  // .then(res => {
+  //   console.log('fetch file response: ', res)
+  // })
+  // .catch(err => {
+  //   console.log('files fetch error: ', err)
+  // })
+}
+
+const formateFileName = (fileName: string) => {
+  console.log('fileName ***',fileName)
+  const match = fileName.split('-')
+  const result = match.filter((str) => str.includes('.'));
+  const index = result.length
+  return result[index - 1]
+}
+
+// const downloadFile = (fileName: string) => {
+//   // Function to download a file from the server
+//   // Specify the filename as part of the URL
+//   console.log('file name -->', { fileName })
+//   const query = `${ENDPOINTS.DOWNLOAD_FILE}?fileName=${fileName}`
+
+//   // Make a GET request to download the file
+//   fetch(query)
+//     .then((response) => {
+//       if (!response.ok) {
+//         throw new Error('Network response was not ok');
+//       }
+//       // Trigger the file download by creating an <a> element with a blob URL
+//       return response.blob();
+//     })
+//     .then((blob) => {
+//       const url = window.URL.createObjectURL(blob);
+//       const a = document.createElement('a');
+//       a.href = url;
+//       a.download = fileName;
+//       a.style.display = 'none';
+//       document.body.appendChild(a);
+//       a.click();
+//       window.URL.revokeObjectURL(url);
+//     })
+//     .catch((error) => {
+//       console.error('Error:', error);
+//     });
+// }
+
+function downloadFile(fileName: string) {
+  const apiUrl = `${ENDPOINTS.DOWNLOAD_FILE}?fileName=${fileName}`;
+  const progressBar = document.getElementById(`${fileName}`);
+
+  fetch(apiUrl).then(async (response) => {
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+
+    const contentLength = response.headers.get('content-length');
+    const downloadStream = response.body;
+
+    const reader = downloadStream.getReader();
+    let receivedLength = 0;
+    const chunks = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      chunks.push(value);
+      receivedLength += value.length;
+
+      // Update the progress bar
+      const percentage = (receivedLength / contentLength) * 100;
+      progressBar.style.width = `${percentage}%`;
+    }
+
+    // Combine the downloaded chunks into a Blob
+    const blob = new Blob(chunks, { type: 'application/octet-stream' });
+
+    // Create a Blob URL and trigger the download
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }).catch((error) => {
+    console.error('Error:', error);
+  });
+}
 
 // Chunk upload apiCall
 const uploadFileChunks = (file: any, options: any) => { // This will take file and create a chunk and upload a file chunk that is remaining
@@ -162,7 +255,7 @@ const uploadFile = (file: any) => { // Upload file request it will create an emp
     })
 }
 
-const splitFile = (e: any) => {
+const splitFile = (e: any) => { // First call all file will be gather here
   console.log('whole event: ', e)
   files.value = Array.from(e.target.files)
   console.log('files that are selected: ', files.value, 'type of files: ', typeof (files.value))
@@ -189,7 +282,7 @@ const resumeUpload = (file: any) => {
     })
 }
 
-const retryUpload = (file:any) => {
+const retryUpload = (file: any) => {
   uploadFileChunks(file, defaultOptions)
 }
 
@@ -198,5 +291,54 @@ const cancelRequest = (file: any) => {
   //   f.fileName == file.name && f.apiToken.cancel('Request canceled by user.'), true
   // })
   file.apiToken.cancel('Request canceled by user.')
-};
+}
 </script>
+
+<style>
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: auto auto;
+  justify-content: center;
+  /* align-items: left; */
+  /* width: 100%; */
+  max-width: fit-content;
+}
+
+.upload-btn {
+  background: #607D8B;
+  color: #fff;
+  border-radius: 5px;
+  padding: 15px 20px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.progress-wrapper {
+  display: inline-block;
+  background-color: #bbb;
+  min-width: 200px;
+  max-width: 200px;
+}
+
+.btns {
+  padding: 6px 12px;
+}
+
+.progress-bar {
+  /* display: inline-block; */
+  height: 15px;
+  /* height: inherit; */
+  background-color: blue;
+  margin-bottom: 12px;
+  width: 0;
+}
+
+.progress-bar-container{
+  background-color: #bbb;
+}
+</style>
